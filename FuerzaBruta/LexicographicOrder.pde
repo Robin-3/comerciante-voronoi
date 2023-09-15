@@ -54,7 +54,12 @@ void reverseArray(int[] array) {
 }
 
 boolean existeEnLista(ArrayList<int[]> array, int[] valor) {
-  for(int[] a : array)
-    if(Arrays.equals(a, valor)) return true;
+  for(int j = 0; j < valor.length; j++) {
+    int[] val = new int[valor.length];
+    for(int i = 0; i < valor.length; i++)
+      val[i] = valor[(i+j)%valor.length];
+    for(int[] a : array)
+      if(Arrays.equals(a, val)) return true;
+  }
   return false;
 }
