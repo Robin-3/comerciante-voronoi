@@ -5,9 +5,8 @@ int H = 32;
 
 Pixel pixeles[] = new Pixel[W*H];
 ArrayList<Point> marcadores = new ArrayList<Point>();
-Graph grafo_voronoi = new Graph();
 int indice_lo = 0;
-ArrayList<int[]> lo = new ArrayList<int[]>();
+int[][] rutas = new int[][] {};
 int[] ruta_optima_indices = new int[0];
 float distancia_minima = Float.MAX_VALUE;
 Timer temporizador = new Timer();
@@ -84,18 +83,18 @@ void draw() {
   strokeWeight(7);
   float distancia_actual = 0;
   for(int i = 0; i < marcadores.size()-int(circuto_abierto); i++) {
-    int orden_1 = lo.get(indice_lo)[i];
-    int orden_2 = lo.get(indice_lo)[(i+1)%marcadores.size()];
+    int orden_1 = rutas[indice_lo][i];
+    int orden_2 = rutas[indice_lo][(i+1)%marcadores.size()];
     Point vertice_1 = marcadores.get(orden_1);
     Point vertice_2 = marcadores.get(orden_2);
     distancia_actual += dist(vertice_1.x, vertice_1.y, vertice_2.x, vertice_2.y);
     line(vertice_1.x*w+w/2, vertice_1.y*h+h/2, vertice_2.x*w+w/2, vertice_2.y*h+h/2);
   }
   if(ruta_optima_indices.length > 0) {
-    surface.setTitle(Arrays.toString(lo.get(indice_lo)));
+    surface.setTitle(Arrays.toString(rutas[indice_lo]));
     if(distancia_actual < distancia_minima) {
       distancia_minima = distancia_actual;
-      ruta_optima_indices = lo.get(indice_lo);
+      ruta_optima_indices = rutas[indice_lo];
     }
   }
   
@@ -117,7 +116,7 @@ void draw() {
     fill(0);
     text(marcadores.indexOf(marcador), marcador.x*w+w/2, marcador.y*h+h/2);
   }
-  if(indice_lo < lo.size()-1)
+  if(indice_lo < rutas.length-1)
     indice_lo++;
   else {
     if(marcadores.size() > 0) {
@@ -181,11 +180,7 @@ void AgregarMarcadores(ArrayList<Point> nuevos_marcadores) {
 
 void ActualizarCache() {
   // Limpieza de datos
-  grafo_voronoi.limpiarVertices();
-  grafo_voronoi.generarMatrizAdyacenciaVacia(0);
-  
   indice_lo = 0;
-  lo.clear();
   ruta_optima_indices = new int[0];
   distancia_minima = Float.MAX_VALUE;
 
@@ -210,27 +205,27 @@ void ActualizarCache() {
   for(Point marcador : marcadores)
     marcador.obtenerVecinos();
 
-  grafo_voronoi.generarMatrizAdyacenciaVacia(marcadores.size());
-  for(int i = 0; i < marcadores.size(); i++) {
-    Point marcador = marcadores.get(i);
-    ArrayList<int[]> conexiones = new ArrayList<int[]>();
-    conexiones.add(new int[] {i, marcador.x, marcador.y});
+  ArrayList<Tree> pseudo_grafo = new ArrayList<Tree>();
+  for(Point marcador : marcadores)
+    pseudo_grafo.add(new Tree(marcador, new ArrayList<Point>()));
+  
+  ArrayList<ArrayList<Point>> rutas_encontradas = new ArrayList<ArrayList<Point>>();
+  for(Tree nodo : pseudo_grafo) {
+    nodo.buscarRutas(marcadores.size(), rutas_encontradas);
+  }
+  rutas = new int[rutas_encontradas.size()][marcadores.size()];
+  for(int i = 0; i < rutas_encontradas.size(); i++) {
     for(int j = 0; j < marcadores.size(); j++) {
-      Point m = marcadores.get(j);
-      if(!marcador.vecinos.contains(m)) continue;
-      conexiones.add(new int[] {j, m.x, m.y});
+      rutas[i][j] = marcadores.indexOf(rutas_encontradas.get(i).get(j));
     }
-    grafo_voronoi.AgregarVertices(conexiones);
   }
   
-  lo = generarCombinaciones(marcadores.size(), grafo_voronoi.matriz_adyacencia);
   ruta_optima_indices = new int[marcadores.size()];
   
   // Información
   println("--------------");
   println("   Marcadores: "+marcadores.size());
-  println("   Conexiones: "+grafo_voronoi.conexiones.size());
-  println("Combinaciones: "+lo.size());
+  println("Combinaciones: "+rutas.length);
   
   //Para pruebas
   //String[] s = new String[lo.size()];
