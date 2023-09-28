@@ -4,21 +4,21 @@ class Timer {
   int startTime = 0, stopTime = 0;
   boolean running = false;  
   
-  void iniciar() {
+  void start() {
     this.startTime = millis();
     this.running = true;
   }
   
-  void parar() {
+  void stop() {
     this.stopTime = millis();
     this.running = false;
   }
   
-  int tiempoTranscurrido() {
+  int elapsedTime() {
     return this.running? millis()-this.startTime: this.stopTime-this.startTime;
   }
   
-  float segundos() {
-    return this.tiempoTranscurrido()/1000.0;
+  float seconds() {
+    return this.elapsedTime()/1000.0;
   }
 }

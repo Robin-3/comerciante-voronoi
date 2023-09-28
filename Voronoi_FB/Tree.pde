@@ -1,79 +1,87 @@
+/**
+ * Clase para representar un árbol utilizado en la generación de diagramas de Voronoi.
+ */
 class Tree {
-  Point nodo;
-  ArrayList<Point> ruta_raiz;
-  ArrayList<Tree> arbol_hijo;
+  Point node;
+  List<Point> rootPath; // Lista de marcadores en la ruta hacia la raíz del árbol
+  Set<Tree> childTrees; // Subárboles
   
-  Tree(Point nodo, ArrayList<Point> ruta_raiz) {
-    this.nodo = nodo;
-    this.ruta_raiz = ruta_raiz;
-    this.arbol_hijo = new ArrayList<Tree>();
-    this.calcular_ramas();
+  /**
+   * Constructor de la clase Tree.
+   *
+   * @param node El nodo del árbol.
+   * @param rootPath La lista de puntos en la ruta raíz del árbol.
+   * @throws NullPointerException     Si el marcador es nulo.
+   */
+  Tree(Point node, List<Point> rootPath) {
+    Objects.requireNonNull(node, "El marcador no puede ser nulo.");
+    this.node = node;
+    this.rootPath = rootPath;
+    this.childTrees = new HashSet<>();
+  }
+    
+  /**
+   * Constructor de la clase Tree que asigna la ruta hacia la raíz como una lista vacia.
+   *
+   * @param node El nodo del árbol.
+   */
+  Tree(Point node) {
+    this(node, new ArrayList<>());
   }
   
-  void calcular_ramas() {
-    ArrayList<Point> r_r = copiarArrayList(this.ruta_raiz);
-    r_r.add(this.nodo);
-    for(Point vecino : this.nodo.vecinos) {
-      if(!(ruta_raiz.contains(vecino) || vecino == nodo)) {
-        this.arbol_hijo.add(new Tree(vecino, r_r));
+  /**
+   * Calcula las ramas del árbol a partir del nodo actual.
+   */
+  void calculateBranches() {
+    List<Point> extendedPath = new ArrayList<> (this.rootPath);
+    extendedPath.add(this.node);
+    for(Point neighbor : this.node.getNeighbors())
+      if(!(this.rootPath.contains(neighbor))) {
+        Tree child = new Tree(neighbor, extendedPath);
+        child.calculateBranches();
+        this.childTrees.add(child);
       }
-    }
   }
   
-  void buscarRutas(int longitud, ArrayList<ArrayList<Point>> rutas_encontradas) {
-    if(this.arbol_hijo.size() == 0 && this.ruta_raiz.size() == longitud-1) {
-      ArrayList<Point> ruta = copiarArrayList(this.ruta_raiz);
-      ruta.add(this.nodo);
+  /**
+   * Busca rutas de una longitud específica en el árbol y las agrega a la lista de rutas encontradas.
+   *
+   * @param longitud La longitud deseada de las rutas.
+   * @param rutasEncontradas Lista de rutas encontradas.
+   */
+  void buscarRutas(int length, List<List<Point>> foundPaths) {
+    if(this.childTrees.isEmpty() && this.rootPath.size() == length-1) {
+      List<Point> path = new ArrayList<> (this.rootPath);
+      path.add(this.node);
       
-      ArrayList<Point> ruta_reversa = invertirArrayList(ruta);
-      if(!(existeEnLista(rutas_encontradas, ruta) || existeEnLista(rutas_encontradas, ruta_reversa)))
-        rutas_encontradas.add(ruta);
+      if(!existsInList(foundPaths, path))
+        foundPaths.add(path);
       return;
     }
     
-    for(Tree hijo : this.arbol_hijo) {
-      hijo.buscarRutas(longitud, rutas_encontradas);
-    }
-  }
-  
-  void imprimirArbol(int nivel) {
-    println("\t".repeat(nivel)+""+this.nodo);
-    for(Tree hijo : this.arbol_hijo) {
-      hijo.imprimirArbol(nivel+1);
+    for(Tree child : this.childTrees) {
+      child.buscarRutas(length, foundPaths);
     }
   }
 }
 
-ArrayList<Point> copiarArrayList(ArrayList<Point> original) {
-  ArrayList<Point> copia = new ArrayList<Point>();
-  for(Point o : original) {
-    copia.add(o);
-  }
-  return copia;
-}
-
-ArrayList<Point> invertirArrayList(ArrayList<Point> original) {
-  ArrayList<Point> copia = new ArrayList<Point>();
-  for (int i = original.size()-1; i >= 0 ; i--)
-    copia.add(original.get(i));
-  return copia;
-}
-
-boolean existeEnLista(ArrayList<ArrayList<Point>> array, ArrayList<Point> valor) {
-  for(int j = 0; j < valor.size(); j++) {
-    ArrayList<Point> val = new ArrayList<Point>();
-    for(int i = 0; i < valor.size(); i++)
-      val.add(valor.get((i+j)%valor.size()));
-    for(ArrayList<Point> a : array) {
-      if(igualArrayList(a, val)) return true;
-    }
+/**
+ * Verifica si una lista cíclica existe en la lista de listas.
+ *
+ * @param listList    Lista de listas.
+ * @param targetList  Lista que se busca.
+ * @return true si la lista existe en la lista de listas, false en caso contrario.
+ */
+boolean existsInList(List<List<Point>> listList, List<Point> targetList) {
+  int size = targetList.size();
+  for (int i = 0; i < size; i++) {
+    List<Point> val = new ArrayList<> (targetList.subList(i, size));
+    val.addAll(targetList.subList(0, i));
+    List<Point> reversed = new ArrayList<> (val);
+    Collections.reverse(reversed);
+    
+    if (listList.contains(val) || listList.contains(reversed))
+      return true;
   }
   return false;
-}
-
-boolean igualArrayList(ArrayList<Point> a, ArrayList<Point> b) {
-  if(a.size() != b.size()) return false;
-  for(int i = 0; i < a.size(); i++)
-    if(a.get(i) != b.get(i)) return false;
-  return true;
 }

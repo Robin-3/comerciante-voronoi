@@ -1,35 +1,90 @@
+/**
+ * Clase para representar un píxel en un diagrama de Voronoi.
+ */
 class Pixel {
-  int x, y;
-  Pixel[] pixeles_adyacentes;
-  boolean fue_visitada, es_limite;
-  Point marcador_cercano;
+  final int x, y;         // Coordenadas del píxel en la matriz
+  Pixel[] adjacentPixels; // Píxeles adyacentes a este píxel en la matriz
+  boolean wasVisited;     // Indica si el píxel ha sido visitado durante la asignación del marcador
+  boolean isBoundary;     // Indica si el píxel está en el límite de una región de Voronoi
+  PointDistance marker;   // El marcador más cercano a este píxel junto a su distancia
   
+  /**
+   * Constructor de la clase Pixel.
+   *
+   * @param x La coordenada X del píxel.
+   * @param y La coordenada Y del píxel.
+   */
   Pixel(int x, int y) {
     this.x = x;
     this.y = y;
   }
   
-  void cargarPixelesAdyacentes(Pixel[] pixeles) {
-    this.pixeles_adyacentes = pixeles;
+  /**
+   * Establece los píxeles adyacentes a este píxel.
+   *
+   * @param pixels Los píxeles adyacentes.
+   */
+  void setAdjacentPixels(Pixel[] pixels) {
+    this.adjacentPixels = pixels;
   }
   
-  void obtenerMarcadorCercano(Point nuevo_marcador) {
-    if (this.fue_visitada) return;
-    float distancia_actual = Float.MAX_VALUE;
-    if(this.marcador_cercano != null)
-      distancia_actual = dist(this.marcador_cercano.x, this.marcador_cercano.y, this.x, this.y);
-    float distancia_nueva = dist(nuevo_marcador.x, nuevo_marcador.y, this.x, this.y);
-    if(distancia_nueva < distancia_actual) {
-      this.marcador_cercano = nuevo_marcador;
-      this.fue_visitada = true;
-      this.es_limite = false;
-      for(Pixel vecino : this.pixeles_adyacentes) {
-        vecino.obtenerMarcadorCercano(nuevo_marcador);
-        vecino.fue_visitada = false;
-        if(vecino.marcador_cercano != this.marcador_cercano) {
-          this.es_limite = true;
-          vecino.es_limite = true;
+  /**
+   * Limpia los datos del píxel para su reutilización.
+   */
+  void reset() {
+    this.wasVisited = false;
+    this.isBoundary = false;
+    this.marker = null;
+  }
+  
+  /**
+   * Asigna el marcador más cercano a este píxel.
+   *
+   * @param newMarker El nuevo marcador a asignar.
+   */
+  void assignClosestMarker(Point newMarker) {
+    if (this.marker == null)
+      this.marker = new PointDistance(newMarker);
+    
+    Stack<Pixel> neighborsToVisit = new Stack<>();
+    Stack<Pixel[]> updateBoundaries = new Stack<>();
+    neighborsToVisit.push(this);
+    
+    while (!neighborsToVisit.isEmpty()) {
+      Pixel currentPixel = neighborsToVisit.pop();
+      int currentDistance = currentPixel.marker.getDistance();
+      int newDistance = distance(newMarker.x, newMarker.y, currentPixel.x, currentPixel.y);
+      
+      if (newDistance < currentDistance) {
+        PointDistance markerDistance = new PointDistance(newMarker, newDistance);
+        if(currentPixel.marker.equals(markerDistance))
+          currentPixel.marker.setDistance(newDistance);
+        else
+          currentPixel.marker = markerDistance;
+        
+        currentPixel.wasVisited = true;
+        
+        for (Pixel neighbor : currentPixel.adjacentPixels) {
+          if (!neighbor.wasVisited) {
+            if (neighbor.marker == null)
+              neighbor.marker = new PointDistance(newMarker);
+            
+            neighborsToVisit.push(neighbor);
+            neighbor.isBoundary = false;
+            updateBoundaries.push(new Pixel[] {currentPixel, neighbor});
+          }
         }
+      }
+    }
+    
+    while (!updateBoundaries.isEmpty()) {
+      Pixel[] pixels = updateBoundaries.pop();
+      Pixel currentPixel = pixels[0];
+      Pixel neighborPixel = pixels[1];
+      neighborPixel.wasVisited = false;
+      if (!currentPixel.marker.equals(neighborPixel.marker)) {
+        currentPixel.isBoundary = true;
+        neighborPixel.isBoundary = true;
       }
     }
   }

@@ -1,16 +1,22 @@
+import java.util.Collections;
+import java.util.Objects;
+import java.util.HashSet;
 import java.util.Arrays;
+import java.util.Stack;
+import java.util.List;
+import java.util.Set;
 
 int W = 32;
 int H = 32;
 
-Pixel pixeles[] = new Pixel[W*H];
-ArrayList<Point> marcadores = new ArrayList<Point>();
-int indice_lo = 0;
-int[][] rutas = new int[][] {};
-int[] ruta_optima_indices = new int[0];
-float distancia_minima = Float.MAX_VALUE;
-Timer temporizador = new Timer();
-boolean circuto_abierto = false;
+Pixel pixels[] = new Pixel[W*H];
+List<Point> markers = new ArrayList<>();
+int orderIndex = 0;
+int[][] paths = new int[][] {};
+int[] optimalPathIndices = new int[0];
+int minDistance = Integer.MAX_VALUE;
+Timer timer = new Timer();
+boolean openCircuit = false;
 
 //PImage img;
 
@@ -21,24 +27,22 @@ void setup() {
   
   for (int j = 0; j < H; j++)
     for (int i = 0; i < W; i++)
-      pixeles[j*W+i] = new Pixel(i, j);
+      pixels[j*W+i] = new Pixel(i, j);
   
   for (int j = 0; j < H; j++) {
     for (int i = 0; i < W; i++) {
-      ArrayList<Pixel> pixeles_adyacentes = new ArrayList<Pixel>();
-      if(i-1 >= 0)
-        pixeles_adyacentes.add(pixeles[j*W+(i-1)]);
-      if(j-1 >= 0)
-        pixeles_adyacentes.add(pixeles[(j-1)*W+i]);
-      if(i+1 < W)
-        pixeles_adyacentes.add(pixeles[j*W+(i+1)]);
-      if(j+1 < H)
-        pixeles_adyacentes.add(pixeles[(j+1)*W+i]);
+      Set<Pixel> adjacentPixels = new HashSet<>();
+      if(i-1 >= 0) //izquierda
+        adjacentPixels.add(pixels[j*W+(i-1)]);
+      if(j-1 >= 0) //arriba
+        adjacentPixels.add(pixels[(j-1)*W+i]);
+      if(i+1 < W && j+1 < H) //abajo-derecha
+        adjacentPixels.add(pixels[(j+1)*W+(i+1)]);
       
-      Pixel[] p_a = new Pixel[pixeles_adyacentes.size()];
-      p_a = pixeles_adyacentes.toArray(p_a);
+      Pixel[] adjacentArray = new Pixel[adjacentPixels.size()];
+      adjacentArray = adjacentPixels.toArray(adjacentArray);
       
-      pixeles[j*W+i].cargarPixelesAdyacentes(p_a);
+      pixels[j*W+i].setAdjacentPixels(adjacentArray);
     }
   }
   
@@ -50,81 +54,78 @@ void draw() {
   background(0);
   //image(img, 0, 0, width, height);
   noStroke();
-  float w = width/(W+.0);
-  float h = height/(H+.0);
+  float w = width/(W+0.0);
+  float h = height/(H+0.0);
   
   // Cuadricula
   noFill();
   stroke(255);
-  for(int j = 0; j < H; j++) {
-    for(int i = 0; i < W; i++) {
+  for(int j = 0; j < H; j++)
+    for(int i = 0; i < W; i++)
       rect(i*w, j*h, w, h);
-    }
-  }
   
   //Limites ciudades
-  for(Point marcador : marcadores) {
-    fill(map(marcador.y*W+marcador.x, 0, W*H, 0, 255), 255, 255, 3*255/4);
-    for(Pixel pixel : marcador.limites)
+  for(Point marker : markers) {
+    fill(map(marker.y*W+marker.x, 0, W*H, 0, 255), 255, 255, 3*255/4);
+    for(Pixel pixel : marker.boundaries)
       rect(pixel.x*w, pixel.y*h, w, h);
   }
   
   //Conexiones - Rutas totales
   stroke(255, 255/8);
   strokeWeight(10);
-  for(Point marcador : marcadores) {
-    for(Point m : marcador.vecinos) {
-      line(marcador.x*w+w/2, marcador.y*h+h/2, m.x*w+w/2, m.y*h+h/2);
-    }
-  }
+  for(Point marker : markers)
+    for(Point m : marker.getNeighbors())
+      line(marker.x*w+w/2, marker.y*h+h/2, m.x*w+w/2, m.y*h+h/2);
   
   //Ruta actual calculada
   stroke(255/2, 255/2);
   strokeWeight(7);
-  float distancia_actual = 0;
-  for(int i = 0; i < marcadores.size()-int(circuto_abierto); i++) {
-    int orden_1 = rutas[indice_lo][i];
-    int orden_2 = rutas[indice_lo][(i+1)%marcadores.size()];
-    Point vertice_1 = marcadores.get(orden_1);
-    Point vertice_2 = marcadores.get(orden_2);
-    distancia_actual += dist(vertice_1.x, vertice_1.y, vertice_2.x, vertice_2.y);
+  int currentDistance = 0;
+  for(int i = 0; i < markers.size()-int(openCircuit); i++) {
+    int order1 = paths[orderIndex][i];
+    int order2 = paths[orderIndex][(i+1)%markers.size()];
+    Point vertice_1 = markers.get(order1);
+    Point vertice_2 = markers.get(order2);
+    currentDistance += vertice_1.neighborDistance(vertice_2);
     line(vertice_1.x*w+w/2, vertice_1.y*h+h/2, vertice_2.x*w+w/2, vertice_2.y*h+h/2);
   }
-  if(ruta_optima_indices.length > 0) {
-    surface.setTitle(Arrays.toString(rutas[indice_lo]));
-    if(distancia_actual < distancia_minima) {
-      distancia_minima = distancia_actual;
-      ruta_optima_indices = rutas[indice_lo];
+  
+  if(optimalPathIndices.length > 0) {
+    surface.setTitle(Arrays.toString(paths[orderIndex]));
+    if(currentDistance < minDistance) {
+      minDistance = currentDistance;
+      optimalPathIndices = paths[orderIndex];
     }
   }
   
   //Ruta optima
   stroke(0);
   strokeWeight(4);
-  for(int i = 0; i < ruta_optima_indices.length-int(circuto_abierto); i++) {
-    Point vertice_1 = marcadores.get(ruta_optima_indices[i]);
-    Point vertice_2 = marcadores.get(ruta_optima_indices[(i+1)%ruta_optima_indices.length]);
-    line(vertice_1.x*w+w/2, vertice_1.y*h+h/2, vertice_2.x*w+w/2, vertice_2.y*h+h/2);
+  for(int i = 0; i < optimalPathIndices.length-int(openCircuit); i++) {
+    Point vertex1 = markers.get(optimalPathIndices[i]);
+    Point vertex2 = markers.get(optimalPathIndices[(i+1)%optimalPathIndices.length]);
+    line(vertex1.x*w+w/2, vertex1.y*h+h/2, vertex2.x*w+w/2, vertex2.y*h+h/2);
   }
   
   //Ciudades
   strokeWeight(1);
   noStroke();
-  for(Point marcador : marcadores) {
-    fill(map(marcador.y*W+marcador.x, 0, W*H, 0, 255), 255, 255);
-    rect(marcador.x*w, marcador.y*h, w, h);
+  for(Point marker : markers) {
+    fill(map(marker.y*W+marker.x, 0, W*H, 0, 255), 255, 255);
+    rect(marker.x*w, marker.y*h, w, h);
     fill(0);
-    text(marcadores.indexOf(marcador), marcador.x*w+w/2, marcador.y*h+h/2);
+    text(markers.indexOf(marker), marker.x*w+w/2, marker.y*h+h/2);
   }
-  if(indice_lo < rutas.length-1)
-    indice_lo++;
+  if(orderIndex < paths.length-1)
+    orderIndex++;
   else {
-    if(marcadores.size() > 0) {
-      temporizador.parar();
-      surface.setTitle(Arrays.toString(ruta_optima_indices));
-      println("    Distancia: "+distancia_minima);
-      println("        Orden: "+Arrays.toString(ruta_optima_indices));
-      println("       Tiempo: "+temporizador.segundos());
+    if(markers.size() > 0) {
+      timer.stop();
+      surface.setTitle(Arrays.toString(optimalPathIndices));
+      println("    Distancia: "+minDistance);
+      println("        Orden: "+Arrays.toString(optimalPathIndices));
+      println("       Tiempo: "+timer.seconds());
     }
     noLoop();
   }
@@ -134,111 +135,90 @@ void mousePressed() {
   int x = max(min(floor(map(mouseX, 0, width, 0, W)), W-1), 0);
   int y = max(min(floor(map(mouseY, 0, height, 0, H)), H-1), 0);
   
-  Point existe = null;
-  for(Point marcador : marcadores)
-    if(marcador.x == x && marcador.y == y) {
-      existe = marcador;
+  Point exists = null;
+  for(Point marker : markers)
+    if(marker.x == x && marker.y == y) {
+      exists = marker;
       break;
     }
 
-  if(existe != null) {
-    for(Pixel pixel : pixeles)
-      pixel.marcador_cercano = null;
-    
-    int indice = marcadores.indexOf(existe);
-    marcadores.remove(indice);
-    AgregarMarcadores(marcadores);
-  } else {
-    Point nuevo_marcador = new Point(x, y);
-    marcadores.add(nuevo_marcador);
-    AgregarMarcador(nuevo_marcador);
-  }
+  if(exists != null)
+    markers.remove(exists);
+  else
+    markers.add(new Point(x, y));
   
-  ActualizarCache();
+  updateCache();
   loop();
 }
 
 void keyPressed() {
-  if (key == 'c' || key == 'C') {
-    circuto_abierto = !circuto_abierto;
-  }
-  ActualizarCache();
+  if (key == 'c' || key == 'C')
+    openCircuit = !openCircuit;
+  
+  updateCache();
   loop();
 }
 
-void AgregarMarcador(Point marcador) {
-    int index = marcador.y*W+marcador.x;
-    pixeles[index].obtenerMarcadorCercano(marcador);
-}
-
-void AgregarMarcadores(ArrayList<Point> nuevos_marcadores) {
-  for(Point marcador : nuevos_marcadores) {
-    int index = marcador.y*W+marcador.x;
-    pixeles[index].obtenerMarcadorCercano(marcador);
+void addMarkers(List<Point> newMarkers) {
+  for(Point marker : newMarkers) {
+    int index = marker.y*W+marker.x;
+    pixels[index].assignClosestMarker(marker);
   }
 }
 
-void ActualizarCache() {
+void updateCache() {
   // Limpieza de datos
-  indice_lo = 0;
-  ruta_optima_indices = new int[0];
-  distancia_minima = Float.MAX_VALUE;
+  orderIndex = 0;
+  optimalPathIndices = new int[0];
+  minDistance = Integer.MAX_VALUE;
 
-  for(Point marcador : marcadores)
-    marcador.limpiarVecinos();
+  for(Pixel pixel : pixels)
+    pixel.reset();
   
-  temporizador.iniciar();
+  for(Point marker : markers)
+    marker.neighborPaths.clear();
+  
+  timer.start();
   
   // Carga de datos
-  ArrayList<Pixel>[] cache = new ArrayList[marcadores.size()];
+  addMarkers(markers);
+  
+  List<Pixel>[] cache = new ArrayList[markers.size()];
   
   for(int i = 0; i < cache.length; i++)
     cache[i] = new ArrayList<Pixel>();
   
-  for(Pixel pixel : pixeles)
-    if(pixel.es_limite)
-      cache[marcadores.indexOf(pixel.marcador_cercano)].add(pixel);
+  for(Pixel pixel : pixels)
+    if(pixel.isBoundary)
+      cache[markers.indexOf(pixel.marker.getMarker())].add(pixel);
   
-  for(int i = 0; i < marcadores.size(); i++)
-    marcadores.get(i).actualizarLimites(cache[i]);
+  for(int i = 0; i < markers.size(); i++)
+    markers.get(i).setBoundaryPixels(cache[i]);
 
-  for(Point marcador : marcadores)
-    marcador.obtenerVecinos();
+  for(Point marker : markers)
+    marker.calculateNeighbors();
 
-  ArrayList<Tree> pseudo_grafo = new ArrayList<Tree>();
-  for(Point marcador : marcadores)
-    pseudo_grafo.add(new Tree(marcador, new ArrayList<Point>()));
+  List<Tree> pseudoGraph = new ArrayList<>();
+  for(Point marker : markers)
+    pseudoGraph.add(new Tree(marker));
   
-  ArrayList<ArrayList<Point>> rutas_encontradas = new ArrayList<ArrayList<Point>>();
-  for(Tree nodo : pseudo_grafo) {
-    nodo.buscarRutas(marcadores.size(), rutas_encontradas);
+  for(Tree pGraph : pseudoGraph)
+    pGraph.calculateBranches();
+    
+  List<List<Point>> foundPaths = new ArrayList<List<Point>>();
+  for(Tree node : pseudoGraph) {
+    node.buscarRutas(markers.size(), foundPaths);
   }
-  rutas = new int[rutas_encontradas.size()][marcadores.size()];
-  for(int i = 0; i < rutas_encontradas.size(); i++) {
-    for(int j = 0; j < marcadores.size(); j++) {
-      rutas[i][j] = marcadores.indexOf(rutas_encontradas.get(i).get(j));
-    }
-  }
+  paths = new int[foundPaths.size()][markers.size()];
+  for(int i = 0; i < foundPaths.size(); i++)
+    for(int j = 0; j < markers.size(); j++)
+      paths[i][j] = markers.indexOf(foundPaths.get(i).get(j));
   
-  ruta_optima_indices = new int[marcadores.size()];
+  if(paths.length != 0)
+    optimalPathIndices = paths[0];
   
   // Información
   println("--------------");
-  println("   Marcadores: "+marcadores.size());
-  println("Combinaciones: "+rutas.length);
-  
-  //Para pruebas
-  //String[] s = new String[lo.size()];
-  //for(int i = 0; i < lo.size(); i++) {
-  //  float d = 0;
-  //  for(int j = 0; j < marcadores.size(); j++) {
-  //    int orden_1 = lo.get(i)[j];
-  //    int orden_2 = lo.get(i)[(j+1)%marcadores.size()];
-  //    Point vertice_1 = marcadores.get(orden_1);
-  //    Point vertice_2 = marcadores.get(orden_2);
-  //    d += dist(vertice_1.x, vertice_1.y, vertice_2.x, vertice_2.y);
-  //  }
-  //  s[i] = Arrays.toString(lo.get(i))+" : "+d;
-  //}
-  //saveStrings("combinaciones.txt", s);
+  println("   Marcadores: "+markers.size());
+  println("Combinaciones: "+paths.length);
 }
